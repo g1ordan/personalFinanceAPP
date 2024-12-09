@@ -50,7 +50,7 @@ class _SplashScreenState extends State<SplashScreen> {
             Text(
               'Finanças Pessoais',
               style: TextStyle(
-                fontSize: 24,
+                fontSize: 35,
                 fontWeight: FontWeight.bold,
                 color: Colors.green,
               ),

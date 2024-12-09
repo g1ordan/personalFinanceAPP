@@ -17,7 +17,16 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Finanças Pessoais'),
+        title: Row(
+          children: [
+            const Icon(
+              Icons.account_balance_wallet,
+              color: Colors.green,
+            ),
+            const SizedBox(width: 8),
+            const Text('Finanças Pessoais'),
+          ],
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.exit_to_app),

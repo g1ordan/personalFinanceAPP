@@ -2,8 +2,8 @@ import 'package:financas_pessoais/src/screens/cadastro_screen.dart';
 import 'package:financas_pessoais/src/screens/home_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../widgets/login_form_widget.dart';
-import '../widgets/custom_button_widget.dart';
+import '../widgets/login_form.dart';
+import '../widgets/custom_button.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
