@@ -1,7 +1,9 @@
+import 'package:financas_pessoais/src/screens/cadastro_screen.dart';
+import 'package:financas_pessoais/src/screens/home_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:financas_pessoais/src/screens/home_screen.dart';
-import 'package:financas_pessoais/src/screens/cadastro_screen.dart';
+import '../widgets/login_form_widget.dart';
+import '../widgets/custom_button_widget.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -18,31 +20,27 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _login() async {
     if (_formKey.currentState!.validate()) {
+      setState(() => _isLoading = true);
       try {
-        print("Login attempt with: ${_emailController.text}"); // Debug print
-
-        final userCredential =
+        final credential =
             await FirebaseAuth.instance.signInWithEmailAndPassword(
           email: _emailController.text.trim(),
           password: _senhaController.text.trim(),
         );
-
-        print(
-            "Login successful with UID: ${userCredential.user?.uid}"); // Debug print
-
-        if (userCredential.user != null && mounted) {
-          print("Navigating to home"); // Debug print
-          Navigator.of(context).pushReplacement(
+        if (credential.user != null && mounted) {
+          Navigator.pushReplacement(
+            context,
             MaterialPageRoute(builder: (_) => const HomeScreen()),
           );
         }
       } catch (e) {
-        print("Login error: $e"); // Debug print
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Erro no login: $e')),
           );
         }
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
       }
     }
   }
@@ -52,60 +50,47 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text(
-                'Finanças Pessoais',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.green,
-                ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.account_balance_wallet,
+              size: 80,
+              color: Colors.green,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Finanças Pessoais',
+              style: TextStyle(
+                fontSize: 35,
+                fontWeight: FontWeight.bold,
+                color: Colors.green,
               ),
-              const SizedBox(height: 32),
-              TextFormField(
-                controller: _emailController,
-                decoration: const InputDecoration(
-                  labelText: 'Email',
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.emailAddress,
-                validator: (value) =>
-                    value?.isEmpty ?? true ? 'Digite seu email' : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _senhaController,
-                decoration: const InputDecoration(
-                  labelText: 'Senha',
-                  border: OutlineInputBorder(),
-                ),
-                obscureText: true,
-                validator: (value) =>
-                    value?.isEmpty ?? true ? 'Digite sua senha' : null,
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _isLoading ? null : _login,
-                child: _isLoading
-                    ? const CircularProgressIndicator()
-                    : const Text('Entrar'),
-              ),
-              const SizedBox(height: 16),
-              TextButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const CadastroScreen()),
-                  );
-                },
-                child: const Text('Criar conta'),
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 32),
+            LoginFormWidget(
+              emailController: _emailController,
+              senhaController: _senhaController,
+              formKey: _formKey,
+              onLogin: _login,
+            ),
+            const SizedBox(height: 24),
+            CustomButtonWidget(
+              onPressed: _login,
+              text: 'Entrar',
+              isLoading: _isLoading,
+            ),
+            const SizedBox(height: 16),
+            CustomButtonWidget(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CadastroScreen()),
+                );
+              },
+              text: 'Criar conta',
+            ),
+          ],
         ),
       ),
     );
