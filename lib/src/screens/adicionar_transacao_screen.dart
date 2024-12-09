@@ -26,9 +26,11 @@ class _AdicionarTransacaoScreenState extends State<AdicionarTransacaoScreen> {
   final _nomeController = TextEditingController();
   final _valorController = TextEditingController();
   final _transacaoService = TransacaoService();
+
   String _categoriaSelecionada = 'Alimentação';
   TipoTransacao _tipoTransacao = TipoTransacao.despesa;
   DateTime _dataSelecionada = DateTime.now();
+  bool _isLoading = false;
 
   final List<String> _categorias = [
     'Alimentação',
@@ -61,64 +63,131 @@ class _AdicionarTransacaoScreenState extends State<AdicionarTransacaoScreen> {
       lastDate: DateTime(2100),
     );
     if (data != null) {
-      setState(() {
-        _dataSelecionada = data;
-      });
+      setState(() => _dataSelecionada = data);
     }
   }
 
-  Future<void> _salvarTransacao() async {
-    if (_formKey.currentState!.validate()) {
+  bool _validarCampos() {
+    if (_nomeController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Digite um nome para a transação'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return false;
+    }
+
+    try {
       final valor = double.parse(_valorController.text.replaceAll(',', '.'));
-      final transacao = Transacao(
-        id: widget.transacao?.id ?? '',
-        descricao: _nomeController.text,
-        valor: _tipoTransacao == TipoTransacao.despesa ? -valor : valor,
-        data: _dataSelecionada,
-        usuarioId: FirebaseAuth.instance.currentUser!.uid,
+      if (valor <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('O valor deve ser maior que zero'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return false;
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Digite um valor válido'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return false;
+    }
+
+    return true;
+  }
+
+  Future<bool> _mostrarConfirmacao(String acao) async {
+    return await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: Text('Confirmar $acao'),
+            content: Text('Deseja realmente $acao esta transação?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancelar'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: Text(acao, style: const TextStyle(color: Colors.green)),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
+  Future<void> _salvarTransacao() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    final acao = widget.transacao != null ? 'atualizar' : 'adicionar';
+    final confirmado = await _mostrarConfirmacao(acao);
+
+    if (confirmado) {
+      setState(() => _isLoading = true);
+
+      // Navigate immediately after confirmation
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const HomeScreen()),
       );
 
-      if (widget.transacao != null) {
-        await _transacaoService.atualizarTransacao(transacao.id, transacao);
-      } else {
-        await _transacaoService.adicionarTransacao(transacao);
-      }
-
-      if (mounted) {
-        widget.onSave?.call();
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-          (route) => false,
+      try {
+        final valor = double.parse(_valorController.text.replaceAll(',', '.'));
+        final transacao = Transacao(
+          id: widget.transacao?.id ?? '',
+          descricao: _nomeController.text.trim(),
+          valor: _tipoTransacao == TipoTransacao.despesa ? -valor : valor,
+          data: _dataSelecionada,
+          usuarioId: FirebaseAuth.instance.currentUser!.uid,
         );
+
+        if (widget.transacao != null) {
+          await _transacaoService.atualizarTransacao(transacao.id, transacao);
+        } else {
+          await _transacaoService.adicionarTransacao(transacao);
+        }
+
+        setState(() => _isLoading = false);
+      } catch (e) {
+        setState(() => _isLoading = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erro: $e'), backgroundColor: Colors.red),
+          );
+        }
       }
     }
   }
 
   Future<void> _deletarTransacao() async {
-    final confirmar = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirmar Exclusão'),
-        content: const Text('Deseja realmente excluir esta transação?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Excluir', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
+    final confirmado = await _mostrarConfirmacao('excluir');
 
-    if (confirmar == true && mounted) {
-      await _transacaoService.deletarTransacao(widget.transacao!.id);
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
-        (route) => false,
+    if (confirmado) {
+      setState(() => _isLoading = true);
+
+      // Navigate immediately after confirmation
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const HomeScreen()),
       );
+
+      try {
+        await _transacaoService.deletarTransacao(widget.transacao!.id);
+        setState(() => _isLoading = false);
+      } catch (e) {
+        setState(() => _isLoading = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erro: $e'), backgroundColor: Colors.red),
+          );
+        }
+      }
     }
   }
 
@@ -127,108 +196,114 @@ class _AdicionarTransacaoScreenState extends State<AdicionarTransacaoScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-            widget.transacao == null ? 'Nova Transação' : 'Menu Transação'),
+            widget.transacao == null ? 'Nova Transação' : 'Editar Transação'),
         actions: widget.transacao != null
             ? [
                 IconButton(
                   icon: const Icon(Icons.delete, color: Colors.red),
-                  onPressed: _deletarTransacao,
+                  onPressed: _isLoading ? null : _deletarTransacao,
                 ),
               ]
             : null,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            children: [
-              SegmentedButton<TipoTransacao>(
-                segments: const [
-                  ButtonSegment(
-                    value: TipoTransacao.despesa,
-                    label: Text('Despesa'),
-                  ),
-                  ButtonSegment(
-                    value: TipoTransacao.receita,
-                    label: Text('Receita'),
-                  ),
-                ],
-                selected: {_tipoTransacao},
-                onSelectionChanged: (Set<TipoTransacao> newSelection) {
-                  setState(() {
-                    _tipoTransacao = newSelection.first;
-                  });
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _nomeController,
-                decoration: const InputDecoration(
-                  labelText: 'Nome',
-                  border: OutlineInputBorder(),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Form(
+                key: _formKey,
+                child: ListView(
+                  children: [
+                    SegmentedButton<TipoTransacao>(
+                      segments: const [
+                        ButtonSegment(
+                          value: TipoTransacao.despesa,
+                          label: Text('Despesa'),
+                        ),
+                        ButtonSegment(
+                          value: TipoTransacao.receita,
+                          label: Text('Receita'),
+                        ),
+                      ],
+                      selected: {_tipoTransacao},
+                      onSelectionChanged: (Set<TipoTransacao> newSelection) {
+                        setState(() => _tipoTransacao = newSelection.first);
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _nomeController,
+                      decoration: const InputDecoration(
+                        labelText: 'Nome',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (value) =>
+                          value?.isEmpty ?? true ? 'Digite um nome' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _valorController,
+                      decoration: const InputDecoration(
+                        labelText: 'Valor',
+                        border: OutlineInputBorder(),
+                        prefixText: 'R\$ ',
+                      ),
+                      keyboardType: TextInputType.number,
+                      validator: (value) {
+                        if (value?.isEmpty ?? true) return 'Digite um valor';
+                        if (double.tryParse(value!.replaceAll(',', '.')) ==
+                            null) {
+                          return 'Valor inválido';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      value: _categoriaSelecionada,
+                      decoration: const InputDecoration(
+                        labelText: 'Categoria',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: _categorias.map((categoria) {
+                        return DropdownMenuItem(
+                          value: categoria,
+                          child: Text(categoria),
+                        );
+                      }).toList(),
+                      onChanged: (String? newValue) {
+                        if (newValue != null) {
+                          setState(() => _categoriaSelecionada = newValue);
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    OutlinedButton.icon(
+                      onPressed: _selecionarData,
+                      icon: const Icon(Icons.calendar_today),
+                      label: Text(
+                        'Data: ${_dataSelecionada.day}/${_dataSelecionada.month}/${_dataSelecionada.year}',
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: _isLoading ? null : _salvarTransacao,
+                      child: Text(
+                        widget.transacao == null ? 'Adicionar' : 'Atualizar',
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                    ),
+                  ],
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Por favor, insira um nome';
-                  }
-                  return null;
-                },
               ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _valorController,
-                decoration: const InputDecoration(
-                  labelText: 'Valor',
-                  border: OutlineInputBorder(),
-                  prefixText: 'R\$ ',
-                ),
-                keyboardType: TextInputType.numberWithOptions(decimal: true),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Por favor, insira um valor';
-                  }
-                  if (double.tryParse(value.replaceAll(',', '.')) == null) {
-                    return 'Por favor, insira um valor válido';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: _categoriaSelecionada,
-                decoration: const InputDecoration(
-                  labelText: 'Categoria',
-                  border: OutlineInputBorder(),
-                ),
-                items: _categorias.map((String categoria) {
-                  return DropdownMenuItem(
-                    value: categoria,
-                    child: Text(categoria),
-                  );
-                }).toList(),
-                onChanged: (String? newValue) {
-                  setState(() {
-                    _categoriaSelecionada = newValue!;
-                  });
-                },
-              ),
-              const SizedBox(height: 16),
-              OutlinedButton(
-                onPressed: _selecionarData,
-                child: Text(
-                  'Data: ${_dataSelecionada.day}/${_dataSelecionada.month}/${_dataSelecionada.year}',
-                ),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _salvarTransacao,
-                child: Text(widget.transacao == null ? 'Salvar' : 'Atualizar'),
-              ),
-            ],
-          ),
-        ),
-      ),
+            ),
     );
+  }
+
+  @override
+  void dispose() {
+    _nomeController.dispose();
+    _valorController.dispose();
+    super.dispose();
   }
 }
