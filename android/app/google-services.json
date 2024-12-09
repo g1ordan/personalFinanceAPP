@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "309592921069",
+    "project_id": "financas-pessoais-8d85b",
+    "storage_bucket": "financas-pessoais-8d85b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:309592921069:android:71f89e7f0ccda95e900de4",
+        "android_client_info": {
+          "package_name": "com.example.financas_pessoais"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBmA4kVD2G4o2AxjXdInhyslu5FlbrlbTo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
